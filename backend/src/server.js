@@ -1,0 +1,15 @@
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import { connectDatabase } from "./config/db.js";
+import authRoutes from "./routes/auth.js";
+import organizationRoutes from "./routes/organizations.js";
+import campaignRoutes from "./routes/campaigns.js";
+import donationRoutes from "./routes/donations.js";
+import adminRoutes from "./routes/admin.js";
+const app = express();
+app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(",") || true })); app.use(express.json());
+app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
+app.use("/api/auth", authRoutes); app.use("/api/organizations", organizationRoutes); app.use("/api/campaigns", campaignRoutes); app.use("/api/donations", donationRoutes); app.use("/api/admin", adminRoutes);
+app.use((error, _req, res, _next) => { console.error(error); res.status(error.status || 500).json({ message: error.message || "Unexpected server error" }); });
+connectDatabase().then(() => app.listen(process.env.PORT || 5000, () => console.log(`API listening on ${process.env.PORT || 5000}`))).catch((error) => { console.error("Database connection failed", error); process.exit(1); });

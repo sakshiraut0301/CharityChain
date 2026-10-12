@@ -1,0 +1,13 @@
+import express from "express";
+import Campaign from "../models/Campaign.js";
+import Organization from "../models/Organization.js";
+import UtilizationUpdate from "../models/UtilizationUpdate.js";
+import { allow, protect } from "../middleware/auth.js";
+import { filesToMetadata, upload } from "../middleware/upload.js";
+const router = express.Router();
+router.get("/", async (_req, res, next) => { try { res.json(await Campaign.find({ status: "active" }).populate("organization", "name city mission walletAddress")); } catch (error) { next(error); } });
+router.post("/", protect, allow("organization"), upload.array("proofFiles", 5), async (req, res, next) => { try { const organization = await Organization.findOne({ owner: req.user._id, status: "approved" }); if (!organization) return res.status(403).json({ message: "Only verified organizations can launch campaigns" }); const campaign = await Campaign.create({ ...req.body, organization: organization._id, proofFiles: filesToMetadata(req.files) }); res.status(201).json(campaign); } catch (error) { next(error); } });
+router.get("/mine", protect, allow("organization"), async (req, res, next) => { try { const organization = await Organization.findOne({ owner: req.user._id }); res.json(await Campaign.find({ organization: organization?._id })); } catch (error) { next(error); } });
+router.get("/:id/updates", async (req, res, next) => { try { res.json(await UtilizationUpdate.find({ campaign: req.params.id }).sort({ createdAt: -1 })); } catch (error) { next(error); } });
+router.post("/:id/updates", protect, allow("organization"), upload.array("proofFiles", 5), async (req, res, next) => { try { const campaign = await Campaign.findById(req.params.id).populate("organization"); if (!campaign || String(campaign.organization.owner) !== String(req.user._id)) return res.status(403).json({ message: "You can update only your own campaign" }); res.status(201).json(await UtilizationUpdate.create({ campaign: campaign._id, ...req.body, proofFiles: filesToMetadata(req.files) })); } catch (error) { next(error); } });
+export default router;

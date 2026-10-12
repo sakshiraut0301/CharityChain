@@ -1,0 +1,12 @@
+import express from "express";
+import Organization from "../models/Organization.js";
+import User from "../models/User.js";
+import { allow, protect } from "../middleware/auth.js";
+import { filesToMetadata, upload } from "../middleware/upload.js";
+const router = express.Router();
+router.get("/", async (_req, res, next) => { try { res.json(await Organization.find({ status: "approved" }).select("-documents")); } catch (error) { next(error); } });
+router.post("/", protect, allow("organization"), upload.array("documents", 5), async (req, res, next) => { try { if (await Organization.exists({ owner: req.user._id })) return res.status(409).json({ message: "Organization profile already submitted" }); const organization = await Organization.create({ ...req.body, owner: req.user._id, documents: filesToMetadata(req.files) }); req.user.organization = organization._id; await req.user.save(); res.status(201).json(organization); } catch (error) { next(error); } });
+router.get("/me", protect, allow("organization"), async (req, res, next) => { try { res.json(await Organization.findOne({ owner: req.user._id })); } catch (error) { next(error); } });
+router.patch("/:id/verify", protect, allow("admin"), async (req, res, next) => { try { const organization = await Organization.findByIdAndUpdate(req.params.id, { status: "approved", verifiedAt: new Date() }, { new: true }); if (!organization) return res.status(404).json({ message: "Organization not found" }); res.json(organization); } catch (error) { next(error); } });
+router.get("/admin/pending", protect, allow("admin"), async (_req, res, next) => { try { res.json(await Organization.find({ status: "pending" })); } catch (error) { next(error); } });
+export default router;
